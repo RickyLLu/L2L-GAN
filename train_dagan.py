@@ -24,7 +24,7 @@ args = get_dagan_args()
 #dataset_path = args.dataset_path
 #raw_data = np.load(dataset_path).copy()
 
-final_generator_path = 'resources/g.pth.tar'
+final_generator_path = 'resources/g_25.pth.tar'
 save_checkpoint_path = args.save_checkpoint_path
 load_checkpoint_path = args.load_checkpoint_path
 #in_channels = raw_data.shape[-1]
@@ -102,7 +102,7 @@ trainer = DaganTrainer(
 trainer.train(data_loader=train_dataloader, epochs=epochs, val_images=flat_val_data)
 
 # Save final generator model
-torch.save(trainer.g, final_generator_path)
+torch.save(trainer.g.state_dict(), final_generator_path)
 
 
 #CUDA_VISIBLE_DEVICES = 0 python train_dagan.py --batch_size = 4 --img_size = 256 --num_training_classes = 20 --num_val_classes = 5 --epochs = 30 --max_pixel_value = 255 --save_checkpoint_path = 'checkpoints' --dropout_rate = 0.001

@@ -167,7 +167,7 @@ class DaganTrainer:
     def sample_generator(self, input_images, z=None):
         if z is None:
             z = torch.randn((input_images.shape[0], self.g.z_dim)).to(self.device)
-        return self.g(input_images, z)
+        return self.g(input_images, z)[-1]
 
     def render_img(self, arr):
         arr = (arr * 0.5) + 0.5
@@ -204,7 +204,7 @@ class DaganTrainer:
         self.render_img(torch.cat(images, 1)[0])
         z = torch.randn((len(images), self.g.z_dim)).to(self.device)
         inp = torch.stack(images).to(self.device)
-        train_gen = self.g(inp, z).cpu()
+        train_gen = self.g(inp, z)[-1].cpu()
         self.render_img(train_gen.reshape(-1, train_gen.shape[-1]))
 
     def print_progress(self, data_loader, val_images):
@@ -214,7 +214,7 @@ class DaganTrainer:
                 self.display_generations(data_loader, val_images)
             if self.num_tracking_images > 0:
                 self.tracking_images_gens.append(
-                    self.g(self.tracking_images, self.tracking_z).cpu()
+                    self.g(self.tracking_images, self.tracking_z)[-1].cpu()
                 )
         self.g.train()
         print("D: {}".format(self.losses["D"][-1]))
@@ -223,6 +223,7 @@ class DaganTrainer:
         print("Gradient norm: {}".format(self.losses["gradient_norm"][-1]))
         if self.num_steps > self.critic_iterations:
             print("G: {}".format(self.losses["G"][-1]))
+        print("")
 
     def _save_checkpoint(self):
         if self.checkpoint_path is None:

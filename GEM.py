@@ -4,22 +4,54 @@ import torch
 from torch import nn
 import torch.nn.functional as F
 
-class GEM(nn.module):
-    '''
-    generative enhancement module
-    '''
+'''
+encode->0>decode0->1->decode1->2->deocode2
+->3->decode3->4->decode4->5->final_conv1->6->final_conv2->7
 
+'''
+
+
+class GEM_single(nn.Module):
+    '''
+    generative enhancement module --single version
+    '''
     def __init__(self, dim):
+        super().__init__()
         self.in_channel = dim
         self.gem_conv = nn.Conv2d(self.in_channel, self.in_channel, kernel_size=3,
                                stride=2, padding=1)
         self.up_sample = nn.Upsample(scale_factor=2)
 
     def forward(self, x):
-        x = self.gem_conv1(x)
-        x = self.up_sample(x)
-
+        x=self.gem_conv(x)
+        x=self.up_sample(x)
         return x
+
+
+
+class GEM(nn.Module):
+    '''
+    generative enhancement module
+    '''
+
+    def __init__(self, dim):
+        super().__init__()
+        self.in_channel = dim
+        self.gem_pre_conv = nn.Conv2d(self.in_channel, self.in_channel, kernel_size=3,
+                               stride=2, padding=1)
+        self.gem_conv = nn.Conv2d(self.in_channel, self.in_channel, kernel_size=3,
+                               stride=2, padding=1)
+        self.up_sample = nn.Upsample(scale_factor=2)
+        #self.down_sample = nn.Downsampel
+
+    def forward(self, pre_input, x):
+        pre_input = self.gem_pre_conv(pre_input)
+        pre_input = self.up_sample(pre_input)
+
+        x=self.gem_conv(x)
+        x=self.up_sample(x)
+
+        return pre_input, x
 
 
 
@@ -200,7 +232,7 @@ class _DecoderBlock(nn.Module):
 
 
 class Generator_GEM(nn.Module):
-    def __init__(self, dim, channels, dropout_rate=0.0, z_dim=100, gem_position=[]):
+    def __init__(self, dim, channels, gem_position=[], dropout_rate=0.0, z_dim=100):
         super().__init__()
         self.dim = dim
         self.z_dim = z_dim
@@ -208,8 +240,10 @@ class Generator_GEM(nn.Module):
         self.layer_sizes = [64, 64, 128, 128]
         self.num_inner_layers = 3
 
+        #gem parameter
         self.gem_num=len(gem_position)
         self.gem_position=gem_position
+        self.gem_channel=[128,128,128,64,64,64,64,64]
 
         # Number of times dimension is halved
         self.U_depth = len(self.layer_sizes)
@@ -298,10 +332,29 @@ class Generator_GEM(nn.Module):
             ),
         )
         self.tanh = nn.Tanh()
+        for i in range(self.gem_num):
+            if self.gem_position[i]==6 or self.gem_position[i]==7 or self.gem_position[i]==0:
+                self.add_module(
+                    "gem%d" %(i),
+                    GEM_single(dim=self.gem_channel[self.gem_position[i]]),
+                )
+            else:
+                self.add_module(
+                    "gem%d" % (i),
+                    GEM(dim=self.gem_channel[self.gem_position[i]]),
+                )
+        '''
+        for i in range(self.gem_num):
+            if self.gem_position[i]==6 or self.gem_position[i]==7 or self.gem_position[i]==0:
+                self.gems.append(GEM_single(dim=self.gem_channel[self.gem_position[i]]))
+            else:
+                self.gems.append(GEM(dim=self.gem_channel[self.gem_position[i]]))
+        '''
 
     def forward(self, x, z):
         # Final output of every encoding block
         all_outputs = [x, self.encode0(x)]
+
         #all (128*128*3, 64*64*64)
         # Last 2 layer outputs
         out = [x, self.encode0(x)]
@@ -313,7 +366,15 @@ class Generator_GEM(nn.Module):
         #    print(i.shape)
         pre_input, curr_input = None, out[1]
         #           w/16*h/16*128
-        features=[out[1]]
+        original_features=[out[1]]
+        current_feat_layer=0
+        current_gem_num=0
+        if current_feat_layer in self.gem_position:
+            #print(0)
+            curr_input = self._modules["gem%d" % current_gem_num](curr_input)
+            #curr_input =self.gems[current_gem_num](curr_input)
+            current_gem_num+=1
+        features=[curr_input]
         for i in range(self.U_depth + 1):
             if i > 0:
                 curr_input = torch.cat([curr_input, all_outputs[-i - 1]], 1)
@@ -329,11 +390,37 @@ class Generator_GEM(nn.Module):
             pre_input, curr_input = self._modules["decode%d" % i](
                 [pre_input, curr_input]
             )
+            original_features.append(curr_input)
+            current_feat_layer+=1
+            if current_feat_layer in self.gem_position:
+                #print(1)
+                #print(current_gem_num, current_feat_layer, type(self.gems[current_gem_num]))
+                pre_input, curr_input = self._modules["gem%d" % current_gem_num](pre_input, curr_input)
+                #pre_input, curr_input = self.gems[current_gem_num](pre_input, curr_input)
+                #print(111)
+                current_gem_num+=1
+
             features.append(curr_input)
 
         for i in range(self.num_final_conv):
             curr_input = self._modules["final_conv%d" % i](curr_input)
+            original_features.append(curr_input)
+
+            current_feat_layer+=1
+            if current_feat_layer in self.gem_position:
+                #curr_input=self.gems[current_gem_num](curr_input)
+                curr_input = self._modules["gem%d" % current_gem_num](curr_input)
+                current_gem_num+=1
             if i<self.num_final_conv-1:
                 features.append(curr_input)
-            #print(curr_input.shape)
-        return features, self.tanh(curr_input)
+        return original_features, features, self.tanh(curr_input)
+
+model=Generator_GEM(dim=128, channels=3, gem_position=[0,1,2,3,4,5,6,7])
+print(model)
+for name, param in model.named_parameters():
+    print(name)
+x=torch.randn((1,3,128,128))
+z=torch.randn((1,100))
+ori, fea, _=model(x,z)
+print(ori[0].shape)
+print(fea[0].shape)

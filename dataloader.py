@@ -15,47 +15,19 @@ from torch.utils.data import Dataset, DataLoader
 from PIL import Image
 import warnings
 
+FILENAMES = ['Taylor_Momsen', 'Peter_Pace', 'Ellen_Wong', 'Xun_Zhou', 'Harry_Hamlin', 'Hugh_Bonneville', 'Verne_Troyer', 'Louise_Brealey', 'Victoria_Justice',
+ 'Charles_Dance', 'Dwight_Schultz', 'Christie_Brinkley', 'Tara_Subkoff', 'Hope_Solo', 'Roma_Downey', 'Freema_Agyeman', 'Geno_Segers',
+ 'Liya_Kebede', 'Hannah_Murray', 'Nicky_Whelan', 'Nina_Arianda', 'Lori_Petty', 'Patricia_Quinn', 'Casey_Wilson', 'Darin_Brooks', 'Drew_Fuller',
+ 'Nicole_de_Boer', 'Wendy_Williams', 'Richard_Pryor', 'Tom_Skerritt', 'Diane_Farr', 'Luke_Treadaway', 'Giuseppe_Tornatore', 'Ivana_Baquero',
+ 'Regina_Hall', 'Wagner_Moura', 'Nancy_Travis', 'Noel_Fielding', 'Elias_Koteas', 'Yvonne_De_Carlo', 'Dave_Foley', 'Peter_Krause', 'Zachary_Quinto',
+ 'Wes_Ramsey', 'Leonor_Watling', 'Gugu_Mbatha-Raw', 'Eddie_Kaye_Thomas', 'Dove_Cameron', 'Carolyn_Hennesy', 'Rachel_True', 'Rami_Malek',
+ 'Grace_Park', 'Nora_Zehetner', 'Craig_Parker', 'Donal_Logue', 'Ricky_Gervais', 'Cher', 'Rider_Strong', 'Gbenga_Akinnagbe', 'Neil_Flynn',
+ 'Connie_Nielsen', 'RZA', 'Tom_Wilkinson', 'Giovanni_Ribisi', 'Olivia_Holt', 'Ben_Stiller', 'Tawny_Cypress', 'Carrie_Preston', 'Preity_Zinta',
+ 'Dominic_Cooper', 'Tanya_Tate', 'David_Lambert', 'Pierfrancesco_Favino', 'Chris_Messina', 'Harvey_Keitel', 'Gia_Mantegna', 'Eddie_McClintock',
+ 'Donnie_Yen']
+
 
 DEVICE = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-
-def preprocess_vggface():
-    files = os.listdir(VGG_PATH)
-    paths = []
-    for file in files:
-        if file[-4:] != '.txt':
-            paths.append(os.path.join(VGG_PATH, file))
-
-    train_path = paths[:-10]
-    val_path = paths[-10:-5]
-    test_path = paths[-5:]
-    train_list, val_list, test_list = [], [], []
-    for p in train_path:
-        imgs = os.listdir(p)
-        for img in imgs:
-            if img[-4:] != '.err':
-                train_list.append(os.path.join(p, img))
-
-    for p in val_path:
-        imgs = os.listdir(p)
-        for img in imgs:
-            if img[-4:] != '.err':
-                val_list.append(os.path.join(p, img))
-
-    for p in test_path:
-        imgs = os.listdir(p)
-        for img in imgs:
-            if img[-4:] != '.err':
-                test_list.append(os.path.join(p, img))
-
-    with open(TRAIN_LIST, 'w') as f:
-        for p in train_list:
-            f.write(p+'\r\n')
-    with open(VAL_LIST, 'w') as f:
-        for p in val_list:
-            f.write(p+'\r\n')
-    with open(TEST_LIST, 'w') as f:
-        for p in test_list:
-            f.write(p+'\r\n')
 
 class VggFace_Dataset(Dataset):
     def __init__(self, txt_file, transform=transforms.ToTensor()):
@@ -111,8 +83,7 @@ class DaganDatasetVgg(Dataset):
             image2 = self.transform(image2)
         return image1, image2
 
-
-def create_dagan_vgg_dataloader(transform, batch_size):
+def preprocess_vggface():
     files = os.listdir(VGG_PATH)
     paths = []
     for file in files:
@@ -120,7 +91,47 @@ def create_dagan_vgg_dataloader(transform, batch_size):
             paths.append(os.path.join(VGG_PATH, file))
 
     train_path = paths[:-10]
+    val_path = paths[-10:-5]
+    test_path = paths[-5:]
+    train_list, val_list, test_list = [], [], []
+    for p in train_path:
+        imgs = os.listdir(p)
+        for img in imgs:
+            if img[-4:] != '.err':
+                train_list.append(os.path.join(p, img))
+
+    for p in val_path:
+        imgs = os.listdir(p)
+        for img in imgs:
+            if img[-4:] != '.err':
+                val_list.append(os.path.join(p, img))
+
+    for p in test_path:
+        imgs = os.listdir(p)
+        for img in imgs:
+            if img[-4:] != '.err':
+                test_list.append(os.path.join(p, img))
+
+    with open(TRAIN_LIST, 'w') as f:
+        for p in train_list:
+            f.write(p+'\r\n')
+    with open(VAL_LIST, 'w') as f:
+        for p in val_list:
+            f.write(p+'\r\n')
+    with open(TEST_LIST, 'w') as f:
+        for p in test_list:
+            f.write(p+'\r\n')
+
+def create_dagan_vgg_dataloader(transform, batch_size):
+    files = FILENAMES
+    paths = []
+    for file in files:
+        if file[-4:] != '.txt':
+            paths.append(os.path.join(VGG_PATH, file))
+
+    train_path = paths[:-10]
     num_classes = len(train_path)
+    print("Number of training classes:{}".format(num_classes))
     train_x1 = []
     train_x2 = []
     for p in train_path:
@@ -137,6 +148,71 @@ def create_dagan_vgg_dataloader(transform, batch_size):
 
     train_dataset = DaganDatasetVgg(train_x1, train_x2, transform)
     return DataLoader(train_dataset, batch_size=batch_size, shuffle=True, num_workers=1)
+
+def create_dagan_vgg_dataloader_small(transform, batch_size):
+    """
+    Dataloader with small number of samples
+    """
+    files = FILENAMES
+    paths = []
+    for file in files:
+        if file[-4:] != '.txt':
+            paths.append(os.path.join(VGG_PATH, file))
+
+    train_path = paths[:-10]
+    num_classes = len(train_path)
+    print("Number of training classes:{}".format(num_classes))
+    train_x1 = []
+    train_x2 = []
+    for p in train_path:
+        train_list = []
+        imgs = os.listdir(p)
+        num_class_sample = 0
+        for img in imgs:
+            if img[-4:] != '.err':
+                train_list.append(os.path.join(p, img))
+                num_class_sample += 1
+                if num_class_sample > 20:
+                    break
+        x2_data_path = train_list
+        np.random.shuffle(x2_data_path)
+        train_x1.extend(train_list)
+        train_x2.extend(x2_data_path)
+    train_dataset = DaganDatasetVgg(train_x1, train_x2, transform)
+    return DataLoader(train_dataset, batch_size=batch_size, shuffle=True, num_workers=1)
+
+def create_dagan_vgg_dataloader_val(transform, batch_size):
+    """
+    Test dataloader
+    """
+    files = FILENAMES
+    paths = []
+    for file in files:
+        if file[-4:] != '.txt':
+            paths.append(os.path.join(VGG_PATH, file))
+
+    train_path = paths[-5:]
+    num_classes = len(train_path)
+    print("Number of testing classes:{}".format(num_classes))
+    train_x1 = []
+    train_x2 = []
+    for p in train_path:
+        train_list = []
+        imgs = os.listdir(p)
+        num_class_sample = 0
+        for img in imgs:
+            if img[-4:] != '.err':
+                train_list.append(os.path.join(p, img))
+                num_class_sample += 1
+                if num_class_sample > 20:
+                    break
+        x2_data_path = train_list
+        np.random.shuffle(x2_data_path)
+        train_x1.extend(train_list)
+        train_x2.extend(x2_data_path)
+    train_dataset = DaganDatasetVgg(train_x1, train_x2, transform)
+    return DataLoader(train_dataset, batch_size=batch_size, shuffle=True, num_workers=1)
+
 
 if __name__=='__main__':
     # preprocess_vggface()

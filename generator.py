@@ -312,13 +312,14 @@ class Generator(nn.Module):
 
         for i in range(self.num_final_conv):
             curr_input = self._modules["final_conv%d" % i](curr_input)
-            if i<self.num_final_conv-1:
+            if i < self.num_final_conv-1:
                 features.append(curr_input)
             #print(curr_input.shape)
         return features, self.tanh(curr_input)
 
 model=Generator(128,3)
-image=torch.randn((1,3,128,128))
-z=torch.randn((1,100))
-a,b = model(image,z)
-print(len(a))
+print(model)
+#image=torch.randn((1,3,128,128))
+#z=torch.randn((1,100))
+#a,b = model(image,z)
+#print(len(a))
